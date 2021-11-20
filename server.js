@@ -1,8 +1,16 @@
 const net = require('net');
+const cluster = require('cluster');
+const { cpus } = require('os');
 
-const server = net.createServer();
+const createCluster = () => {
+  // const numberOfCpus = cpus().length;
+  const numberOfCpus = 64;
+  for (let i = 0; i < numberOfCpus; i++) {
+    cluster.fork()
+  }
+}
 
-server.on('connection', (clientToProxySocket) => {
+const incomingConnectionHandler = (clientToProxySocket) => {
   console.log('Client Connected To Proxy');
   // We need only the data once, the starting packet
   clientToProxySocket.once('data', (data) => {
@@ -51,18 +59,28 @@ server.on('connection', (clientToProxySocket) => {
       console.log(err);
     });
   });
-});
+}
 
-server.on('error', (err) => {
-  console.log('SERVER ERROR');
-  console.log(err);
-  throw err;
-});
+if (cluster.isMaster) {
+  createCluster();
+} else {
+  const server = net.createServer();
 
-server.on('close', () => {
-  console.log('Client Disconnected');
-});
+  server.on('connection', incomingConnectionHandler);
+  
+  server.on('error', (err) => {
+    console.log('SERVER ERROR');
+    console.log(err);
+    throw err;
+  });
+  
+  server.on('close', () => {
+    console.log('Client Disconnected');
+  });
+  
+  server.listen(8124, () => {
+    console.log('Server runnig at http://localhost:' + 8124);
+  });
+    
+}
 
-server.listen(8124, () => {
-  console.log('Server runnig at http://localhost:' + 8124);
-});
